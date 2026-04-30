@@ -1,0 +1,56 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build for ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Fix go.mod version
+        run: |
+          CURRENT_GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//' | cut -d. -f1,2)
+          go mod edit -go=${CURRENT_GO_VERSION}
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Build Binary
+        run: |
+          BINARY_NAME=wiki-search-${{ matrix.goos }}-${{ matrix.goarch }}
+          if [ "${{ matrix.goos }}" = "windows" ]; then BINARY_NAME+='.exe'; fi
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o $BINARY_NAME main.go
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wiki-search-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: wiki-search-*
+
